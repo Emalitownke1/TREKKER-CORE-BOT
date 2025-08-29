@@ -28,14 +28,14 @@ async function setupDatabase() {
 
     // Create indexes
     await db.collection('runningbots').createIndex({ jid: 1 }, { unique: true });
-    await db.collection('wavalidjid').createIndex({ jid: 1 }, { unique: true });
+    await db.collection('wavalidjid').createIndex({ Jid: 1 }, { unique: true });
     await db.collection('wasessions').createIndex({ sessionId: 1 }, { unique: true });
 
     console.log('Database setup completed successfully!');
     
     // Add a sample valid JID for testing
     await db.collection('wavalidjid').insertOne({
-      jid: '254704897825@s.whatsapp.net',
+      Jid: '254704897825@s.whatsapp.net',
       subscribedAt: new Date(),
       status: 'active',
       note: 'Owner account'

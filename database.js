@@ -40,13 +40,13 @@ class DatabaseManager {
   }
 
   async isJidValid(jid) {
-    const result = await this.db.collection('wavalidjid').findOne({ jid });
+    const result = await this.db.collection('wavalidjid').findOne({ Jid: jid });
     return !!result;
   }
 
   async addValidJid(jid) {
     return await this.db.collection('wavalidjid').insertOne({
-      jid,
+      Jid: jid,
       subscribedAt: new Date(),
       status: 'active'
     });

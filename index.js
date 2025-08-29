@@ -52,7 +52,7 @@ async function initMongoDB() {
     
     // Create indexes for better performance
     await db.collection(COLLECTIONS.RUNNING_BOTS).createIndex({ jid: 1 }, { unique: true });
-    await db.collection(COLLECTIONS.VALID_JIDS).createIndex({ jid: 1 }, { unique: true });
+    await db.collection(COLLECTIONS.VALID_JIDS).createIndex({ Jid: 1 }, { unique: true });
     
     return true;
   } catch (error) {
@@ -114,7 +114,7 @@ function extractPhoneNumber(jid) {
 // Check if JID is subscribed
 async function isJidSubscribed(jid) {
   try {
-    const result = await db.collection(COLLECTIONS.VALID_JIDS).findOne({ jid });
+    const result = await db.collection(COLLECTIONS.VALID_JIDS).findOne({ Jid: jid });
     return !!result;
   } catch (error) {
     logger.error('Error checking subscription:', error);
@@ -350,7 +350,7 @@ app.post('/add-subscription', async (req, res) => {
     }
     
     await db.collection(COLLECTIONS.VALID_JIDS).insertOne({
-      jid,
+      Jid: jid,
       subscribedAt: new Date(),
       status: 'active'
     });
