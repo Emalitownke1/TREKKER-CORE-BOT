@@ -1,0 +1,18 @@
+{
+  "name": "trekker-core-bot",
+  "version": "1.0.0",
+  "description": "TREKKER-CORE-BOT",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "baileys": "^6.7.18",
+    "express": "^5.1.0",
+    "whiskey": "^0.8.4"
+  }
+}
