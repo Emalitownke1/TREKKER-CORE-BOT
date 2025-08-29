@@ -1,0 +1,261 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload WhatsApp Session</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 300px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .instructions {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .instructions ul {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Upload WhatsApp Session</h1>
+        
+        <div class="instructions">
+            <h3>How to use:</h3>
+            <ul>
+                <li>Either paste your session JSON data directly in the textarea below</li>
+                <li>Or drag and drop a JSON file containing your session data</li>
+                <li>Enter a unique Session ID for identification</li>
+                <li>Optionally, add a phone number for reference</li>
+            </ul>
+        </div>
+
+        <form id="sessionForm">
+            <div class="form-group">
+                <label for="sessionId">Session ID *</label>
+                <input type="text" id="sessionId" name="sessionId" required placeholder="e.g., session_001">
+            </div>
+
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number (Optional)</label>
+                <input type="text" id="phoneNumber" name="phoneNumber" placeholder="e.g., 254799257758">
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <p>📁 Drop JSON file here or click to browse</p>
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="sessionData">Session Data (JSON) *</label>
+                <textarea id="sessionData" name="sessionData" required placeholder='Paste your session JSON data here...'></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">Upload Session</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const sessionDataTextarea = document.getElementById('sessionData');
+        const form = document.getElementById('sessionForm');
+        const result = document.getElementById('result');
+
+        // File upload handling
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/json') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        sessionDataTextarea.value = JSON.stringify(jsonData, null, 2);
+                        fileInfo.innerHTML = `✅ File loaded: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                    } catch (error) {
+                        fileInfo.innerHTML = `❌ Invalid JSON file: ${file.name}`;
+                        result.innerHTML = '<div class="result error">Invalid JSON file. Please select a valid JSON file.</div>';
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                fileInfo.innerHTML = `❌ Please select a JSON file`;
+                result.innerHTML = '<div class="result error">Please select a JSON file (.json)</div>';
+            }
+        }
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
+
+            const formData = new FormData(form);
+            
+            try {
+                // Validate JSON
+                const sessionData = JSON.parse(formData.get('sessionData'));
+
+                const response = await fetch('/upload-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sessionId: formData.get('sessionId'),
+                        phoneNumber: formData.get('phoneNumber'),
+                        sessionData: sessionData
+                    })
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `<div class="result success">✅ ${responseData.message}</div>`;
+                    form.reset();
+                    fileInfo.innerHTML = '';
+                } else {
+                    result.innerHTML = `<div class="result error">❌ ${responseData.error}</div>`;
+                }
+            } catch (error) {
+                if (error instanceof SyntaxError) {
+                    result.innerHTML = '<div class="result error">❌ Invalid JSON format. Please check your session data.</div>';
+                } else {
+                    result.innerHTML = `<div class="result error">❌ Upload failed: ${error.message}</div>`;
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Upload Session';
+            }
+        });
+    </script>
+</body>
+</html>

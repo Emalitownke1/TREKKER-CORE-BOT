@@ -41,6 +41,11 @@ const logger = pino({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static HTML file for session upload
+app.get('/upload', (req, res) => {
+  res.sendFile(path.join(__dirname, 'upload-session.html'));
+});
+
 // Initialize MongoDB connection
 async function initMongoDB() {
   try {
@@ -406,6 +411,54 @@ app.post('/add-subscription', async (req, res) => {
     res.json({ message: 'Subscription added', jid });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/upload-session', async (req, res) => {
+  try {
+    const { sessionId, phoneNumber, sessionData } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    if (!sessionData) {
+      return res.status(400).json({ error: 'Session data is required' });
+    }
+
+    // Validate that sessionData is an object
+    if (typeof sessionData !== 'object') {
+      return res.status(400).json({ error: 'Session data must be valid JSON object' });
+    }
+
+    // Check if session with this ID already exists
+    const existingSession = await db.collection(COLLECTIONS.PENDING_SESSIONS).findOne({ sessionId });
+    if (existingSession) {
+      return res.status(400).json({ error: 'Session ID already exists' });
+    }
+
+    // Insert session data into wasessions collection
+    const sessionDoc = {
+      sessionId,
+      phoneNumber: phoneNumber || null,
+      uploadedAt: new Date(),
+      status: 'pending',
+      ...sessionData  // Spread the session data
+    };
+
+    await db.collection(COLLECTIONS.PENDING_SESSIONS).insertOne(sessionDoc);
+
+    logger.info(`New session uploaded: ${sessionId} ${phoneNumber ? `(${phoneNumber})` : ''}`);
+
+    res.json({ 
+      message: 'Session uploaded successfully and added to processing queue', 
+      sessionId,
+      phoneNumber 
+    });
+
+  } catch (error) {
+    logger.error('Error uploading session:', error);
+    res.status(500).json({ error: 'Failed to upload session: ' + error.message });
   }
 });
 
