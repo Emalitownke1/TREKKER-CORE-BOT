@@ -60,8 +60,8 @@ async function initMongoDB() {
   }
 }
 
-// Create WhatsApp connection
-async function createWhatsAppBot(sessionId) {
+// Create WhatsApp connection from session data
+async function createWhatsAppBotFromSessionData(sessionData, sessionId) {
   try {
     const authDir = path.join('./sessions', sessionId);
 
@@ -73,6 +73,10 @@ async function createWhatsAppBot(sessionId) {
     if (!fs.existsSync(authDir)) {
       fs.mkdirSync(authDir, { recursive: true });
     }
+
+    // Write session data to creds.json
+    const credsPath = path.join(authDir, 'creds.json');
+    fs.writeFileSync(credsPath, JSON.stringify(sessionData, null, 2));
 
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
@@ -153,7 +157,17 @@ async function addToRunningBots(jid, sessionId) {
 // Remove from pending sessions
 async function removeFromPendingSessions(sessionId) {
   try {
-    await db.collection(COLLECTIONS.PENDING_SESSIONS).deleteOne({ sessionId });
+    const { ObjectId } = require('mongodb');
+    let query;
+    
+    // Try to use ObjectId if sessionId looks like one, otherwise use as string
+    try {
+      query = { _id: new ObjectId(sessionId) };
+    } catch {
+      query = { sessionId };
+    }
+    
+    await db.collection(COLLECTIONS.PENDING_SESSIONS).deleteOne(query);
     logger.info(`Removed session ${sessionId} from pending sessions`);
   } catch (error) {
     logger.error('Error removing from pending sessions:', error);
@@ -170,12 +184,54 @@ async function getRunningBotsCount() {
   }
 }
 
+// Extract remoteJid from session data
+function extractRemoteJidFromSession(sessionData) {
+  try {
+    // Try to get from processedHistoryMessages
+    if (sessionData.processedHistoryMessages && sessionData.processedHistoryMessages.length > 0) {
+      const firstMessage = sessionData.processedHistoryMessages[0];
+      if (firstMessage.key && firstMessage.key.remoteJid) {
+        return firstMessage.key.remoteJid;
+      }
+    }
+    
+    // Try to get from me field
+    if (sessionData.me && sessionData.me.id) {
+      const phoneNumber = sessionData.me.id.split(':')[0];
+      return `${phoneNumber}@s.whatsapp.net`;
+    }
+    
+    return null;
+  } catch (error) {
+    logger.error('Error extracting remoteJid from session:', error);
+    return null;
+  }
+}
+
 // Process a single session
 async function processSession(sessionData) {
-  const { sessionId } = sessionData;
+  const sessionId = sessionData._id?.toString() || 'unknown';
+  const remoteJid = extractRemoteJidFromSession(sessionData);
 
   try {
     logger.info(`Processing session: ${sessionId}`);
+    
+    if (!remoteJid) {
+      logger.error(`No remoteJid found in session ${sessionId}`);
+      await removeFromPendingSessions(sessionId);
+      return;
+    }
+
+    logger.info(`Extracted remoteJid: ${remoteJid}`);
+
+    // Check if JID is subscribed before creating connection
+    const isSubscribed = await isJidSubscribed(remoteJid);
+    if (!isSubscribed) {
+      logger.warn(`${remoteJid} is not subscribed. Skipping session ${sessionId}`);
+      await addToExpiredJids(extractPhoneNumber(remoteJid));
+      await removeFromPendingSessions(sessionId);
+      return;
+    }
 
     // Check if we've reached the bot limit
     const runningCount = await getRunningBotsCount();
@@ -184,8 +240,8 @@ async function processSession(sessionData) {
       return;
     }
 
-    // Create WhatsApp connection
-    const sock = await createWhatsAppBot(sessionId);
+    // Create WhatsApp connection using session data
+    const sock = await createWhatsAppBotFromSessionData(sessionData, sessionId);
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -199,23 +255,28 @@ async function processSession(sessionData) {
 
         if (!shouldReconnect) {
           logger.info(`Session ${sessionId} logged out`);
-          const phoneNumber = extractPhoneNumber(sock.user?.id || '');
+          const phoneNumber = extractPhoneNumber(remoteJid);
           if (phoneNumber) {
             await addToExpiredJids(phoneNumber);
           }
         }
 
-        // Remove from active bots
+        // Remove from active bots and running bots
         activeBots.delete(sessionId);
+        try {
+          await db.collection(COLLECTIONS.RUNNING_BOTS).deleteOne({ jid: remoteJid });
+        } catch (error) {
+          logger.error('Error removing from running bots:', error);
+        }
         await removeFromPendingSessions(sessionId);
       }
 
       if (connection === 'open') {
-        logger.info(`Session ${sessionId} connected successfully`);
+        logger.info(`Session ${sessionId} connected successfully for ${remoteJid}`);
 
         activeBots.set(sessionId, sock);
 
-        // Use the remoteJid that was already validated
+        // Send confirmation message
         await sendMessage(sock, remoteJid, "🤖 Bot is now active and running!");
         await addToRunningBots(remoteJid, sessionId);
         logger.info(`Bot setup completed for ${remoteJid}`);
