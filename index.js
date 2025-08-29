@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 const DB_NAME = 'whatsapp_bots';
 
 // Collections
@@ -196,7 +196,7 @@ async function processSession(sessionData) {
       }
       
       if (connection === 'close') {
-        const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
         
         if (!shouldReconnect) {
           logger.info(`Session ${sessionId} logged out`);
