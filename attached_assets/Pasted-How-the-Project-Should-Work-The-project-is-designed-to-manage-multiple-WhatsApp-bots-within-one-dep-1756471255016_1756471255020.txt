@@ -1,0 +1,112 @@
+How the Project Should Work
+
+The project is designed to manage multiple WhatsApp bots within one deployment. Each bot is tied to a unique WhatsApp number, and all session information is stored in MongoDB. The goal is to automatically fetch sessions, validate them, and manage bot subscriptions in a structured way.
+
+
+---
+
+1. Session Management
+
+All pending sessions are stored inside a MongoDB collection named wasessions.
+
+Each record in this collection represents a WhatsApp account, containing the session ID and authentication data.
+
+The project will loop through the available session IDs, and for each one, it will create a WhatsApp connection using the Baileys library.
+
+
+
+---
+
+2. Validating Sessions
+
+Once a connection is established for a given session, the system should immediately send a start message to that WhatsApp account.
+
+This message should confirm that the session is valid and is now being processed.
+
+If the session is invalid (e.g., expired or broken credentials), the system should extract the WhatsApp number from the session and save it in a separate MongoDB collection called expiredjid for tracking.
+
+
+
+---
+
+3. Subscription Check
+
+After confirming that a session is valid, the system checks another MongoDB collection named wavalidjid.
+
+This collection contains the list of JIDs (WhatsApp IDs) that are allowed to run bots.
+
+If the JID is found in wavalidjid:
+
+Send a message to the user saying: “We are setting up your bot, please wait...”.
+
+
+If the JID is not found:
+
+Send a rejection message: “Not subscribed, please contact the owner @254704897825 for subscription.”
+
+After sending this message, the session should be removed from wasessions to avoid reprocessing it again.
+
+
+
+
+---
+
+4. Running Bots
+
+The project should be capable of running up to 15 bots simultaneously.
+
+Each active bot’s JID will be stored in another MongoDB collection called runningbots.
+
+This ensures the system keeps track of all bots currently online.
+
+If a new session is added and there are already 15 bots running, the system should either wait or reject new sessions until space is available.
+
+
+
+---
+
+5. Automatic Cleanup
+
+Once a session has been processed (whether valid or invalid), the entry in wasessions should be removed.
+
+This prevents duplicate handling of the same session.
+
+Invalid or expired sessions get moved to expiredjid, while valid and subscribed sessions are added to runningbots.
+
+
+
+---
+
+6. Summary of Flow
+
+1. Fetch pending sessions from wasessions.
+
+
+2. Establish a WhatsApp connection for each.
+
+
+3. Send a start message to confirm validity.
+
+
+4. If valid → check wavalidjid.
+
+Found → notify user that setup is in progress.
+
+Not found → send “not subscribed” message.
+
+
+
+5. If invalid → add number to expiredjid.
+
+
+6. Remove session from wasessions.
+
+
+7. For valid sessions, register the JID in runningbots (max 15 at a time).
+
+
+
+
+---
+
+This way, the project ensures smooth multi-bot orchestration: every WhatsApp number gets validated, only subscribed users get active bots, expired sessions are tracked, and a hard limit of 15 running bots is enforced.

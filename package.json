@@ -13,6 +13,7 @@
   "dependencies": {
     "baileys": "^6.7.18",
     "express": "^5.1.0",
+    "mongodb": "^6.19.0",
     "whiskey": "^0.8.4"
   }
 }
